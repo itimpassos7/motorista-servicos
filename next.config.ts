@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  allowedDevOrigins: [
+    "192.168.15.20",
+    "localhost",
+    "barriers-shareware-designer-duck.trycloudflare.com"
+  ],
 };
 
 export default nextConfig;
