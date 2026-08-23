@@ -6,7 +6,6 @@ import Menu from "../components/Menu";
 import * as XLSX from "xlsx-js-style";
 
 export default function Relatorio() {
-
   const [servicos, setServicos] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -15,7 +14,6 @@ export default function Relatorio() {
   );
 
   async function carregar() {
-
     const { data: userData } =
       await supabase.auth.getUser();
 
@@ -59,7 +57,6 @@ export default function Relatorio() {
 
   const kmRodados = servicosMes.reduce(
     (total, item) => {
-
       const inicial = Number(
         item.km_inicial || 0
       );
@@ -90,7 +87,6 @@ export default function Relatorio() {
     : 0;
 
   function dinheiro(valor: number) {
-
     return valor.toLocaleString(
       "pt-BR",
       {
@@ -101,7 +97,6 @@ export default function Relatorio() {
   }
 
   function formatarData(data: string) {
-
     if (!data) return "";
 
     const [ano, mes, dia] =
@@ -110,10 +105,8 @@ export default function Relatorio() {
     return `${dia}/${mes}/${ano}`;
   }
 
-  function exportarExcel() {
-
+  async function exportarExcel() {
     if (servicosMes.length === 0) {
-
       alert(
         "Não existem serviços neste mês."
       );
@@ -121,165 +114,388 @@ export default function Relatorio() {
       return;
     }
 
-    const dados = servicosMes.map((item) => {
+    try {
+      /*
+        ========================================================
+        PREPARA OS DADOS
+        ========================================================
+      */
 
-      const kmInicial = Number(
-        item.km_inicial || 0
+      const dados = servicosMes.map((item) => {
+        const kmInicial = Number(
+          item.km_inicial || 0
+        );
+
+        const kmFinal = Number(
+          item.km_final || 0
+        );
+
+        const kmServico =
+          kmFinal >= kmInicial
+            ? kmFinal - kmInicial
+            : 0;
+
+        return {
+          Data: formatarData(
+            item.data
+          ).toUpperCase(),
+
+          Veículo: (
+            item.veiculo || ""
+          ).toUpperCase(),
+
+          Trajeto: (
+            item.trajeto || ""
+          ).toUpperCase(),
+
+          "KM Inicial": kmInicial,
+
+          "KM Final": kmFinal,
+
+          "KM Rodados": kmServico,
+
+          Valor: Number(
+            item.valor || 0
+          ),
+
+          Observação: (
+            item.observacao || ""
+          ).toUpperCase()
+        };
+      });
+
+      /*
+        ========================================================
+        TOTAIS
+        ========================================================
+      */
+
+      const totalKm = dados.reduce(
+        (total, item) =>
+          total +
+          Number(
+            item["KM Rodados"] || 0
+          ),
+        0
       );
 
-      const kmFinal = Number(
-        item.km_final || 0
-      );
+      const totalFaturamento =
+        dados.reduce(
+          (total, item) =>
+            total +
+            Number(item.Valor || 0),
+          0
+        );
 
-      const kmServico =
-        kmFinal >= kmInicial
-          ? kmFinal - kmInicial
-          : 0;
+      /*
+        ========================================================
+        CRIA PLANILHA
+        ========================================================
+      */
 
-      return {
+      const planilha =
+        XLSX.utils.json_to_sheet(dados);
 
-        Data: formatarData(
-          item.data
-        ).toUpperCase(),
+      const ultimaLinha =
+        dados.length + 1;
 
-        Veículo: (
-          item.veiculo || ""
-        ).toUpperCase(),
+      const linhaTotal =
+        ultimaLinha + 1;
 
-        Trajeto: (
-          item.trajeto || ""
-        ).toUpperCase(),
+      /*
+        ========================================================
+        LARGURA DAS COLUNAS
+        ========================================================
+      */
 
-        "KM Inicial": kmInicial,
+      planilha["!cols"] = [
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 38 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 45 }
+      ];
 
-        "KM Final": kmFinal,
+      /*
+        ========================================================
+        CORES
+        ========================================================
+      */
 
-        "KM Rodados": kmServico,
+      const azul = "2563EB";
+      const azulClaro = "DBEAFE";
+      const verdeClaro = "DCFCE7";
+      const verdeEscuro = "166534";
+      const amarelo = "F59E0B";
+      const branco = "FFFFFF";
+      const cinzaClaro = "F8FAFC";
+      const cinzaBorda = "CBD5E1";
+      const preto = "1E293B";
 
-        Valor: Number(
-          item.valor || 0
-        ),
+      const borda = {
+        top: {
+          style: "thin",
+          color: cinzaBorda
+        },
 
-        Observação: (
-          item.observacao || ""
-        ).toUpperCase()
+        bottom: {
+          style: "thin",
+          color: cinzaBorda
+        },
 
+        left: {
+          style: "thin",
+          color: cinzaBorda
+        },
+
+        right: {
+          style: "thin",
+          color: cinzaBorda
+        }
       };
 
-    });
+      const colunas = [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H"
+      ];
 
-    /*
-      CALCULA OS TOTAIS
-    */
+      /*
+        ========================================================
+        CABEÇALHO
+        ========================================================
+      */
 
-    const totalKm = dados.reduce(
-      (total, item) =>
-        total +
-        Number(item["KM Rodados"] || 0),
-      0
-    );
+      colunas.forEach((coluna) => {
+        const celula =
+          planilha[
+            `${coluna}1`
+          ];
 
-    const totalFaturamento = dados.reduce(
-      (total, item) =>
-        total +
-        Number(item.Valor || 0),
-      0
-    );
+        if (!celula) return;
 
-    /*
-      CRIA PLANILHA
-    */
+        celula.s = {
+          fill: {
+            fgColor: {
+              rgb: azul
+            }
+          },
 
-    const planilha =
-      XLSX.utils.json_to_sheet(dados);
+          font: {
+            bold: true,
+            color: branco,
+            sz: 12
+          },
 
-    const ultimaLinha =
-      dados.length + 1;
+          alignment: {
+            horizontal: "center",
+            vertical: "center"
+          },
 
-    const linhaTotal =
-      ultimaLinha + 1;
+          border: borda
+        };
+      });
 
-    /*
-      LARGURA DAS COLUNAS
-    */
+      /*
+        ========================================================
+        DADOS
+        ========================================================
+      */
 
-    planilha["!cols"] = [
+      for (
+        let linha = 2;
+        linha <= ultimaLinha;
+        linha++
+      ) {
+        const fundo =
+          linha % 2 === 0
+            ? branco
+            : cinzaClaro;
 
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 38 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 15 },
-      { wch: 18 },
-      { wch: 45 }
+        colunas.forEach((coluna) => {
+          const celula =
+            planilha[
+              `${coluna}${linha}`
+            ];
 
-    ];
+          if (!celula) return;
 
-    /*
-      CORES
-    */
+          celula.s = {
+            fill: {
+              fgColor: {
+                rgb: fundo
+              }
+            },
 
-    const azul = "2563EB";
-    const azulClaro = "DBEAFE";
-    const verdeClaro = "DCFCE7";
-    const verdeEscuro = "166534";
-    const amarelo = "F59E0B";
-    const branco = "FFFFFF";
-    const cinzaClaro = "F8FAFC";
-    const cinzaBorda = "CBD5E1";
-    const preto = "1E293B";
+            font: {
+              color: preto,
+              sz: 11
+            },
 
-    const borda = {
+            alignment: {
+              vertical: "center",
 
-      top: {
-        style: "thin",
-        color: cinzaBorda
-      },
+              horizontal:
+                coluna === "C" ||
+                coluna === "H"
+                  ? "left"
+                  : "center"
+            },
 
-      bottom: {
-        style: "thin",
-        color: cinzaBorda
-      },
+            border: borda
+          };
+        });
 
-      left: {
-        style: "thin",
-        color: cinzaBorda
-      },
+        /*
+          KM
+        */
 
-      right: {
-        style: "thin",
-        color: cinzaBorda
+        ["D", "E", "F"].forEach(
+          (coluna) => {
+            const celula =
+              planilha[
+                `${coluna}${linha}`
+              ];
+
+            if (!celula) return;
+
+            celula.s = {
+              fill: {
+                fgColor: {
+                  rgb: azulClaro
+                }
+              },
+
+              font: {
+                color: azul,
+                bold: true
+              },
+
+              alignment: {
+                horizontal: "center",
+                vertical: "center"
+              },
+
+              border: borda
+            };
+          }
+        );
+
+        /*
+          VALOR
+        */
+
+        const valor =
+          planilha[
+            `G${linha}`
+          ];
+
+        if (valor) {
+          valor.z =
+            "R$ #,##0.00";
+
+          valor.s = {
+            fill: {
+              fgColor: {
+                rgb: verdeClaro
+              }
+            },
+
+            font: {
+              color: verdeEscuro,
+              bold: true,
+              sz: 11
+            },
+
+            alignment: {
+              horizontal: "center",
+              vertical: "center"
+            },
+
+            border: borda
+          };
+        }
       }
 
-    };
+      /*
+        ========================================================
+        TOTAL DO MÊS
+        ========================================================
+      */
 
-    const colunas = [
-      "A",
-      "B",
-      "C",
-      "D",
-      "E",
-      "F",
-      "G",
-      "H"
-    ];
+      planilha[
+        `A${linhaTotal}`
+      ] = {
+        t: "s",
+        v: "TOTAL DO MÊS"
+      };
 
-    /*
-      CABEÇALHO
-    */
+      planilha[
+        `F${linhaTotal}`
+      ] = {
+        t: "n",
+        v: totalKm
+      };
 
-    colunas.forEach((coluna) => {
+      planilha[
+        `G${linhaTotal}`
+      ] = {
+        t: "n",
+        v: totalFaturamento,
+        z: "R$ #,##0.00"
+      };
 
-      const celula =
-        planilha[
-          `${coluna}1`
-        ];
+      /*
+        ========================================================
+        ESTILO DO TOTAL
+        ========================================================
+      */
 
-      if (!celula) return;
+      colunas.forEach((coluna) => {
+        const celula =
+          planilha[
+            `${coluna}${linhaTotal}`
+          ];
 
-      celula.s = {
+        if (!celula) return;
 
+        celula.s = {
+          fill: {
+            fgColor: {
+              rgb: amarelo
+            }
+          },
+
+          font: {
+            bold: true,
+            color: branco,
+            sz: 12
+          },
+
+          alignment: {
+            horizontal: "center",
+            vertical: "center"
+          },
+
+          border: borda
+        };
+      });
+
+      /*
+        TOTAL KM
+      */
+
+      planilha[
+        `F${linhaTotal}`
+      ].s = {
         fill: {
           fgColor: {
             rgb: azul
@@ -298,368 +514,208 @@ export default function Relatorio() {
         },
 
         border: borda
-
       };
 
-    });
-
-    /*
-      DADOS
-    */
-
-    for (
-      let linha = 2;
-      linha <= ultimaLinha;
-      linha++
-    ) {
-
-      const fundo =
-        linha % 2 === 0
-          ? branco
-          : cinzaClaro;
-
-      colunas.forEach((coluna) => {
-
-        const celula =
-          planilha[
-            `${coluna}${linha}`
-          ];
-
-        if (!celula) return;
-
-        celula.s = {
-
-          fill: {
-            fgColor: {
-              rgb: fundo
-            }
-          },
-
-          font: {
-            color: preto,
-            sz: 11
-          },
-
-          alignment: {
-
-            vertical: "center",
-
-            horizontal:
-              coluna === "C" ||
-              coluna === "H"
-                ? "left"
-                : "center"
-
-          },
-
-          border: borda
-
-        };
-
-      });
-
       /*
-        KM
+        TOTAL FATURAMENTO
       */
 
-      ["D", "E", "F"].forEach(
-        (coluna) => {
-
-          const celula =
-            planilha[
-              `${coluna}${linha}`
-            ];
-
-          if (!celula) return;
-
-          celula.s = {
-
-            fill: {
-              fgColor: {
-                rgb: azulClaro
-              }
-            },
-
-            font: {
-              color: azul,
-              bold: true
-            },
-
-            alignment: {
-              horizontal: "center",
-              vertical: "center"
-            },
-
-            border: borda
-
-          };
-
-        }
-      );
-
-      /*
-        VALOR
-      */
-
-      const valor =
-        planilha[
-          `G${linha}`
-        ];
-
-      if (valor) {
-
-        valor.z =
-          'R$ #,##0.00';
-
-        valor.s = {
-
-          fill: {
-            fgColor: {
-              rgb: verdeClaro
-            }
-          },
-
-          font: {
-
-            color: verdeEscuro,
-
-            bold: true,
-
-            sz: 11
-
-          },
-
-          alignment: {
-
-            horizontal: "center",
-
-            vertical: "center"
-
-          },
-
-          border: borda
-
-        };
-
-      }
-
-    }
-
-    /*
-      =================================
-      TOTAL DO MÊS
-      =================================
-    */
-
-    planilha[
-      `A${linhaTotal}`
-    ] = {
-
-      t: "s",
-
-      v: "TOTAL DO MÊS"
-
-    };
-
-    /*
-      TOTAL KM
-    */
-
-    planilha[
-      `F${linhaTotal}`
-    ] = {
-
-      t: "n",
-
-      v: totalKm
-
-    };
-
-    /*
-      TOTAL FATURAMENTO
-    */
-
-    planilha[
-      `G${linhaTotal}`
-    ] = {
-
-      t: "n",
-
-      v: totalFaturamento,
-
-      z: 'R$ #,##0.00'
-
-    };
-
-    /*
-      ESTILO TOTAL
-    */
-
-    colunas.forEach((coluna) => {
-
-      const celula =
-        planilha[
-          `${coluna}${linhaTotal}`
-        ];
-
-      if (!celula) return;
-
-      celula.s = {
-
+      planilha[
+        `G${linhaTotal}`
+      ].s = {
         fill: {
-
           fgColor: {
-            rgb: amarelo
+            rgb: verdeEscuro
           }
-
         },
 
         font: {
-
           bold: true,
-
           color: branco,
-
           sz: 12
-
         },
 
         alignment: {
-
           horizontal: "center",
-
           vertical: "center"
-
         },
 
         border: borda
-
       };
 
-    });
+      /*
+        ========================================================
+        FILTRO
+        ========================================================
+      */
 
-    /*
-      TOTAL KM
-    */
+      planilha["!ref"] =
+        `A1:H${linhaTotal}`;
 
-    planilha[
-      `F${linhaTotal}`
-    ].s = {
+      planilha["!autofilter"] = {
+        ref: `A1:H${ultimaLinha}`
+      };
 
-      fill: {
+      /*
+        ========================================================
+        CONGELAR CABEÇALHO
+        ========================================================
+      */
 
-        fgColor: {
-          rgb: azul
-        }
+      planilha["!freeze"] = {
+        xSplit: 0,
+        ySplit: 1
+      };
 
-      },
+      /*
+        ========================================================
+        CRIA LIVRO
+        ========================================================
+      */
 
-      font: {
+      const livro =
+        XLSX.utils.book_new();
 
-        bold: true,
+      XLSX.utils.book_append_sheet(
+        livro,
+        planilha,
+        "Serviços"
+      );
 
-        color: branco,
+      /*
+        ========================================================
+        GERA O XLSX EM ARRAY
+        ========================================================
+      */
 
-        sz: 12
+      const arquivo =
+        XLSX.write(livro, {
+          bookType: "xlsx",
+          type: "array"
+        });
 
-      },
+      /*
+        ========================================================
+        CONVERTE PARA BASE64
+        ========================================================
+      */
 
-      alignment: {
+      const bytes =
+        new Uint8Array(arquivo);
 
-        horizontal: "center",
+      let binario = "";
 
-        vertical: "center"
+      const tamanho =
+        0x8000;
 
-      },
+      for (
+        let i = 0;
+        i < bytes.length;
+        i += tamanho
+      ) {
+        const pedaco =
+          bytes.subarray(
+            i,
+            Math.min(
+              i + tamanho,
+              bytes.length
+            )
+          );
 
-      border: borda
+        binario += String.fromCharCode(
+          ...pedaco
+        );
+      }
 
-    };
+      const base64 =
+        btoa(binario);
 
-    /*
-      TOTAL FATURAMENTO
-    */
+      const nomeArquivo =
+        `Relatorio_Servicos_${mes}.xlsx`;
 
-    planilha[
-      `G${linhaTotal}`
-    ].s = {
+      /*
+        ========================================================
+        INTEGRAÇÃO COM O APLICATIVO ROTAPRO
+        ========================================================
+      */
 
-      fill: {
+      const canalFlutter =
+        (window as any)
+          .RotaProDownload;
 
-        fgColor: {
-          rgb: verdeEscuro
-        }
+      if (
+        canalFlutter &&
+        typeof canalFlutter.postMessage ===
+          "function"
+      ) {
+        canalFlutter.postMessage(
+          JSON.stringify({
+            nome: nomeArquivo,
+            arquivo: base64
+          })
+        );
 
-      },
+        return;
+      }
 
-      font: {
+      /*
+        ========================================================
+        CASO NÃO ESTEJA NO APLICATIVO
+        DOWNLOAD NORMAL DO NAVEGADOR
+        ========================================================
+      */
 
-        bold: true,
+      const blob =
+        new Blob(
+          [arquivo],
+          {
+            type:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          }
+        );
 
-        color: branco,
+      const url =
+        URL.createObjectURL(blob);
 
-        sz: 12
+      const link =
+        document.createElement("a");
 
-      },
+      link.href = url;
 
-      alignment: {
+      link.download =
+        nomeArquivo;
 
-        horizontal: "center",
+      link.style.display =
+        "none";
 
-        vertical: "center"
+      document.body.appendChild(
+        link
+      );
 
-      },
+      link.click();
 
-      border: borda
+      document.body.removeChild(
+        link
+      );
 
-    };
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
 
-    /*
-      FILTRO
-    */
+    } catch (error) {
+      console.error(
+        "Erro ao exportar Excel:",
+        error
+      );
 
-    planilha["!ref"] = `A1:H${linhaTotal}`;
-
-planilha["!autofilter"] = {
-  ref: `A1:H${ultimaLinha}`
-};
-
-    /*
-      CONGELAR CABEÇALHO
-    */
-
-    planilha["!freeze"] = {
-
-      xSplit: 0,
-
-      ySplit: 1
-
-    };
-
-    /*
-      CRIA ARQUIVO
-    */
-
-    const livro =
-      XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(
-      livro,
-      planilha,
-      "Serviços"
-    );
-
-    XLSX.writeFile(
-      livro,
-      `Relatorio_Servicos_${mes}.xlsx`
-    );
-
+      alert(
+        "Não foi possível gerar o arquivo Excel. Tente novamente."
+      );
+    }
   }
 
   if (carregando) {
-
     return (
-
       <main
         style={{
           minHeight: "100vh",
@@ -672,15 +728,11 @@ planilha["!autofilter"] = {
       >
         Carregando...
       </main>
-
     );
-
   }
 
   return (
-
     <>
-
       <Menu />
 
       <main
@@ -693,7 +745,6 @@ planilha["!autofilter"] = {
           margin: "0 auto"
         }}
       >
-
         <h1
           style={{
             color: "#0f172a",
@@ -712,7 +763,6 @@ planilha["!autofilter"] = {
             marginBottom: 20
           }}
         >
-
           <label>
             📅 Escolha o mês
           </label>
@@ -753,7 +803,6 @@ planilha["!autofilter"] = {
           >
             📊 Exportar Excel do mês
           </button>
-
         </div>
 
         <div
@@ -764,9 +813,7 @@ planilha["!autofilter"] = {
             gap: 12
           }}
         >
-
           <div style={cardStyle}>
-
             <div style={tituloStyle}>
               💰 Faturamento
             </div>
@@ -779,11 +826,9 @@ planilha["!autofilter"] = {
             >
               {dinheiro(faturamento)}
             </h2>
-
           </div>
 
           <div style={cardStyle}>
-
             <div style={tituloStyle}>
               📋 Serviços
             </div>
@@ -795,11 +840,9 @@ planilha["!autofilter"] = {
             >
               {servicosMes.length}
             </h2>
-
           </div>
 
           <div style={cardStyle}>
-
             <div style={tituloStyle}>
               🛣️ KM Rodados
             </div>
@@ -811,11 +854,9 @@ planilha["!autofilter"] = {
             >
               {kmRodados} km
             </h2>
-
           </div>
 
           <div style={cardStyle}>
-
             <div style={tituloStyle}>
               📈 Média/Serviço
             </div>
@@ -828,9 +869,7 @@ planilha["!autofilter"] = {
             >
               {dinheiro(media)}
             </h2>
-
           </div>
-
         </div>
 
         <div
@@ -842,7 +881,6 @@ planilha["!autofilter"] = {
             boxShadow: "0 5px 15px #0001"
           }}
         >
-
           <h2>
             🚗🚐 Veículos
           </h2>
@@ -856,7 +894,6 @@ planilha["!autofilter"] = {
             🚐 Van:
             <b> {vans}</b> serviços
           </p>
-
         </div>
 
         <div
@@ -868,13 +905,11 @@ planilha["!autofilter"] = {
             boxShadow: "0 5px 15px #0001"
           }}
         >
-
           <h2>
             📋 Serviços do mês
           </h2>
 
           {servicosMes.length === 0 ? (
-
             <p
               style={{
                 color: "#64748b"
@@ -882,11 +917,8 @@ planilha["!autofilter"] = {
             >
               Nenhum serviço neste mês.
             </p>
-
           ) : (
-
             servicosMes.map((item) => (
-
               <div
                 key={item.id}
                 style={{
@@ -895,7 +927,6 @@ planilha["!autofilter"] = {
                     "1px solid #e5e7eb"
                 }}
               >
-
                 <b>
                   {item.veiculo === "Van"
                     ? "🚐 Van"
@@ -945,7 +976,6 @@ planilha["!autofilter"] = {
                 </p>
 
                 {item.observacao && (
-
                   <p
                     style={{
                       margin: "6px 0",
@@ -954,39 +984,24 @@ planilha["!autofilter"] = {
                   >
                     📝 {item.observacao}
                   </p>
-
                 )}
-
               </div>
-
             ))
-
           )}
-
         </div>
-
       </main>
-
     </>
-
   );
 }
 
 const cardStyle = {
-
   background: "#fff",
-
   padding: 18,
-
   borderRadius: 18,
-
   boxShadow:
     "0 5px 15px #0001"
-
 };
 
 const tituloStyle = {
-
   color: "#64748b"
-
 };
