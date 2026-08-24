@@ -20,11 +20,21 @@ export default function Home() {
   const [statusAssinatura, setStatusAssinatura] =
     useState<"trial" | "active" | "expired" | null>(null);
 
+  // ===========================================================
+  // ADMIN
+  // ===========================================================
+
+  const [isAdmin, setIsAdmin] = useState(false);
+
   useEffect(() => {
     let intervalo: ReturnType<typeof setInterval> | undefined;
 
     async function verificarUsuario() {
       try {
+        // =====================================================
+        // VERIFICAR USUÁRIO LOGADO
+        // =====================================================
+
         const {
           data: { user },
           error: erroUsuario,
@@ -36,15 +46,68 @@ export default function Home() {
         }
 
         // =====================================================
+        // VERIFICAR SE É ADMIN
+        // =====================================================
+
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (session?.access_token) {
+            const respostaAdmin = await fetch(
+              "/api/admin/me",
+              {
+                method: "GET",
+                headers: {
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                cache: "no-store",
+              }
+            );
+
+            const dadosAdmin =
+              await respostaAdmin.json();
+
+            console.log(
+              "Resultado admin:",
+              dadosAdmin
+            );
+
+            if (dadosAdmin.isAdmin === true) {
+              console.log(
+                "ADMIN IDENTIFICADO:",
+                dadosAdmin.email
+              );
+
+              setIsAdmin(true);
+            } else {
+              setIsAdmin(false);
+            }
+          }
+        } catch (erroAdmin) {
+          console.error(
+            "Erro ao verificar administrador:",
+            erroAdmin
+          );
+
+          setIsAdmin(false);
+        }
+
+        // =====================================================
         // BUSCAR ASSINATURA
         // =====================================================
 
-        const { data: assinatura, error: erroAssinatura } =
-          await supabase
-            .from("assinaturas")
-            .select("status, trial_ends_at")
-            .eq("user_id", user.id)
-            .maybeSingle();
+        const {
+          data: assinatura,
+          error: erroAssinatura,
+        } = await supabase
+          .from("assinaturas")
+          .select(
+            "status, trial_ends_at"
+          )
+          .eq("user_id", user.id)
+          .maybeSingle();
 
         if (erroAssinatura) {
           console.error(
@@ -67,7 +130,9 @@ export default function Home() {
 
           setBloqueado(true);
           setStatusAssinatura("expired");
-          setTempoRestante("Assinatura não encontrada");
+          setTempoRestante(
+            "Assinatura não encontrada"
+          );
           setCarregando(false);
 
           return;
@@ -77,7 +142,9 @@ export default function Home() {
         // ASSINATURA ATIVA
         // =====================================================
 
-        if (assinatura.status === "active") {
+        if (
+          assinatura.status === "active"
+        ) {
           setStatusAssinatura("active");
           setBloqueado(false);
           setTempoRestante("");
@@ -94,10 +161,14 @@ export default function Home() {
         // ASSINATURA EXPIRADA
         // =====================================================
 
-        if (assinatura.status === "expired") {
+        if (
+          assinatura.status === "expired"
+        ) {
           setStatusAssinatura("expired");
           setBloqueado(true);
-          setTempoRestante("Teste encerrado");
+          setTempoRestante(
+            "Teste encerrado"
+          );
           setCarregando(false);
 
           if (intervalo) {
@@ -111,19 +182,25 @@ export default function Home() {
         // TRIAL
         // =====================================================
 
-        if (assinatura.status === "trial") {
+        if (
+          assinatura.status === "trial"
+        ) {
           setStatusAssinatura("trial");
 
           const verificarPrazo = () => {
             const agora = new Date();
 
-            if (!assinatura.trial_ends_at) {
+            if (
+              !assinatura.trial_ends_at
+            ) {
               console.error(
                 "Trial sem data de encerramento."
               );
 
               setBloqueado(true);
-              setTempoRestante("Teste encerrado");
+              setTempoRestante(
+                "Teste encerrado"
+              );
               setCarregando(false);
 
               return;
@@ -134,16 +211,21 @@ export default function Home() {
             );
 
             const diferenca =
-              fim.getTime() - agora.getTime();
+              fim.getTime() -
+              agora.getTime();
 
             // =================================================
             // TRIAL EXPIRADO
             // =================================================
 
             if (diferenca <= 0) {
-              setStatusAssinatura("expired");
+              setStatusAssinatura(
+                "expired"
+              );
               setBloqueado(true);
-              setTempoRestante("Teste encerrado");
+              setTempoRestante(
+                "Teste encerrado"
+              );
               setCarregando(false);
 
               if (intervalo) {
@@ -159,7 +241,10 @@ export default function Home() {
 
             const dias = Math.ceil(
               diferenca /
-                (1000 * 60 * 60 * 24)
+                (1000 *
+                  60 *
+                  60 *
+                  24)
             );
 
             if (dias <= 1) {
@@ -197,7 +282,9 @@ export default function Home() {
         );
 
         setBloqueado(true);
-        setStatusAssinatura("expired");
+        setStatusAssinatura(
+          "expired"
+        );
         setTempoRestante(
           "Assinatura inválida"
         );
@@ -214,7 +301,9 @@ export default function Home() {
 
     function setErroInterno() {
       setBloqueado(true);
-      setStatusAssinatura("expired");
+      setStatusAssinatura(
+        "expired"
+      );
       setTempoRestante(
         "Não foi possível verificar sua assinatura."
       );
@@ -462,27 +551,33 @@ export default function Home() {
             Cadastre seus serviços rapidamente
           </p>
 
-          {/* AVISO DO TRIAL */}
+          {/* ===================================================
+              AVISO DO TRIAL
+          =================================================== */}
 
-          {statusAssinatura === "trial" &&
+          {statusAssinatura ===
+            "trial" &&
             tempoRestante && (
               <div
                 style={{
                   marginTop: 20,
-                  padding: "16px 18px",
+                  padding:
+                    "16px 18px",
                   borderRadius: 14,
                   background:
                     "linear-gradient(135deg,#eff6ff,#f0f9ff)",
                   border:
                     "1px solid #bfdbfe",
                   color: "#1e40af",
-                  textAlign: "left",
+                  textAlign:
+                    "left",
                 }}
               >
                 <div
                   style={{
                     fontSize: 13,
-                    fontWeight: "bold",
+                    fontWeight:
+                      "bold",
                     marginBottom: 5,
                   }}
                 >
@@ -512,40 +607,51 @@ export default function Home() {
               </div>
             )}
 
-          {/* AVISO DE USUÁRIO PAGANTE */}
+          {/* ===================================================
+              AVISO DE USUÁRIO PAGANTE
+          =================================================== */}
 
-          {statusAssinatura === "active" && (
-            <div
-              style={{
-                marginTop: 20,
-                padding: "14px 18px",
-                borderRadius: 14,
-                background: "#f0fdf4",
-                border:
-                  "1px solid #bbf7d0",
-                color: "#166534",
-                textAlign: "left",
-              }}
-            >
+          {statusAssinatura ===
+            "active" && (
               <div
                 style={{
-                  fontWeight: "bold",
+                  marginTop: 20,
+                  padding:
+                    "14px 18px",
+                  borderRadius: 14,
+                  background:
+                    "#f0fdf4",
+                  border:
+                    "1px solid #bbf7d0",
+                  color: "#166534",
+                  textAlign:
+                    "left",
                 }}
               >
-                ✅ Assinatura ativa
-              </div>
+                <div
+                  style={{
+                    fontWeight:
+                      "bold",
+                  }}
+                >
+                  ✅ Assinatura ativa
+                </div>
 
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: 14,
-                }}
-              >
-                Seu acesso ao RotaPro está
-                liberado.
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 14,
+                  }}
+                >
+                  Seu acesso ao RotaPro está
+                  liberado.
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+          {/* ===================================================
+              NOVO SERVIÇO
+          =================================================== */}
 
           <Link
             href="/servicos"
@@ -558,15 +664,49 @@ export default function Home() {
               background: "#16a34a",
               color: "#fff",
               fontSize: 18,
-              fontWeight: "bold",
-              textDecoration: "none",
-              boxSizing: "border-box",
+              fontWeight:
+                "bold",
+              textDecoration:
+                "none",
+              boxSizing:
+                "border-box",
             }}
           >
             ➕ Novo Serviço
           </Link>
+
+          {/* ===================================================
+              PAINEL ADMINISTRATIVO
+              APARECE SOMENTE PARA O ADMIN
+          =================================================== */}
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              style={{
+                display: "block",
+                marginTop: 15,
+                width: "100%",
+                padding: 16,
+                borderRadius: 15,
+                background:
+                  "#0f172a",
+                color: "#fff",
+                fontSize: 16,
+                fontWeight:
+                  "bold",
+                textDecoration:
+                  "none",
+                boxSizing:
+                  "border-box",
+              }}
+            >
+              🛠️ Painel Administrativo
+            </Link>
+          )}
         </div>
       </main>
     </>
   );
 }
+
