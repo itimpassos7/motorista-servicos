@@ -7,3 +7,4 @@ minimumReleaseAgeExclude:
   - '@supabase/realtime-js@2.112.1'
   - '@supabase/storage-js@2.112.1'
   - '@supabase/supabase-js@2.112.1'
+  - '@supabase/ssr@0.12.5'
