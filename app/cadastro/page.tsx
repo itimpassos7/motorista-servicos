@@ -36,10 +36,19 @@ export default function Cadastro() {
     setCarregando(true);
 
     try {
+      // URL que será usada pelo link de confirmação do Supabase
+      const redirectUrl = `${window.location.origin}/login`;
+
+      console.log(
+        "URL de redirecionamento:",
+        redirectUrl
+      );
+
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: senha,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             nome: nome.trim(),
           },
@@ -142,8 +151,7 @@ export default function Cadastro() {
           background: "rgba(255,255,255,0.97)",
           borderRadius: 28,
           padding: "32px 28px",
-          boxShadow:
-            "0 25px 70px rgba(0,0,0,0.35)",
+          boxShadow: "0 25px 70px rgba(0,0,0,0.35)",
           position: "relative",
           zIndex: 1,
           boxSizing: "border-box",
@@ -453,4 +461,3 @@ export default function Cadastro() {
     </main>
   );
 }
-
