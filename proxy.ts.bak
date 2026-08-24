@@ -1,0 +1,218 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({
+    request,
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+
+          response = NextResponse.next({
+            request,
+          });
+
+          cookiesToSet.forEach(
+            ({ name, value, options }) => {
+              response.cookies.set(
+                name,
+                value,
+                options
+              );
+            }
+          );
+        },
+      },
+    }
+  );
+
+  const pathname = request.nextUrl.pathname;
+
+  // =====================================================
+  // LOGIN E CADASTRO FICAM LIVRES
+  // =====================================================
+
+  if (
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/cadastro" ||
+    pathname.startsWith("/cadastro/")
+  ) {
+    return response;
+  }
+
+  // =====================================================
+  // BUSCA USUÁRIO
+  // =====================================================
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // =====================================================
+  // QUALQUER PÁGINA FORA DO LOGIN EXIGE LOGIN
+  // =====================================================
+
+  if (!user) {
+    const url = request.nextUrl.clone();
+
+    url.pathname = "/login";
+    url.search = "";
+
+    return NextResponse.redirect(url);
+  }
+
+  // =====================================================
+  // ROTAS QUE EXIGEM ASSINATURA
+  // =====================================================
+
+  const rotasProtegidas = [
+    "/servicos",
+    "/lista",
+    "/relatorio",
+  ];
+
+  const ehRotaProtegida =
+    rotasProtegidas.some(
+      (rota) =>
+        pathname === rota ||
+        pathname.startsWith(`${rota}/`)
+    );
+
+  // Se não for uma rota que exige assinatura,
+  // apenas deixa continuar.
+  if (!ehRotaProtegida) {
+    return response;
+  }
+
+  // =====================================================
+  // BUSCA ASSINATURA
+  // =====================================================
+
+  const {
+    data: assinatura,
+    error,
+  } = await supabase
+    .from("assinaturas")
+    .select("status, trial_ends_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // =====================================================
+  // ERRO AO BUSCAR ASSINATURA
+  // =====================================================
+
+  if (error) {
+    console.error(
+      "Erro ao verificar assinatura:",
+      error
+    );
+
+    const url = request.nextUrl.clone();
+
+    url.pathname = "/";
+    url.search = "";
+
+    return NextResponse.redirect(url);
+  }
+
+  // =====================================================
+  // SEM ASSINATURA
+  // =====================================================
+
+  if (!assinatura) {
+    const url = request.nextUrl.clone();
+
+    url.pathname = "/";
+    url.search = "";
+
+    return NextResponse.redirect(url);
+  }
+
+  // =====================================================
+  // ACTIVE = ACESSO LIBERADO
+  // =====================================================
+
+  if (assinatura.status === "active") {
+    return response;
+  }
+
+  // =====================================================
+  // EXPIRED = BLOQUEADO
+  // =====================================================
+
+  if (assinatura.status === "expired") {
+    const url = request.nextUrl.clone();
+
+    url.pathname = "/";
+    url.search = "";
+
+    return NextResponse.redirect(url);
+  }
+
+  // =====================================================
+  // TRIAL
+  // =====================================================
+
+  if (assinatura.status === "trial") {
+    if (!assinatura.trial_ends_at) {
+      const url = request.nextUrl.clone();
+
+      url.pathname = "/";
+      url.search = "";
+
+      return NextResponse.redirect(url);
+    }
+
+    const agora = new Date();
+
+    const fim = new Date(
+      assinatura.trial_ends_at
+    );
+
+    // Trial ainda válido
+    if (
+      fim.getTime() >
+      agora.getTime()
+    ) {
+      return response;
+    }
+
+    // Trial acabou
+    const url = request.nextUrl.clone();
+
+    url.pathname = "/";
+    url.search = "";
+
+    return NextResponse.redirect(url);
+  }
+
+  // =====================================================
+  // QUALQUER OUTRO STATUS = BLOQUEADO
+  // =====================================================
+
+  const url = request.nextUrl.clone();
+
+  url.pathname = "/";
+  url.search = "";
+
+  return NextResponse.redirect(url);
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)",
+  ],
+};

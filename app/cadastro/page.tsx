@@ -5,66 +5,87 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 
-export default function Login() {
+export default function Cadastro() {
   const router = useRouter();
 
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [sucesso, setSucesso] = useState("");
 
-  async function entrar(e: React.FormEvent) {
+  async function cadastrar(e: React.FormEvent) {
     e.preventDefault();
 
     setErro("");
+    setSucesso("");
+
+    if (senha.length < 6) {
+      setErro("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (senha !== confirmarSenha) {
+      setErro("As senhas não são iguais.");
+      return;
+    }
+
     setCarregando(true);
 
     try {
-      const { data, error } =
-        await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: senha,
-        });
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: senha,
+        options: {
+          data: {
+            nome: nome.trim(),
+          },
+        },
+      });
 
       if (error) {
-        console.error("Erro no login:", error);
+        console.error("Erro ao criar conta:", error);
 
-        setErro(
-          error.message === "Invalid login credentials"
-            ? "E-mail ou senha incorretos."
-            : "Não foi possível entrar. Tente novamente."
-        );
-
-        setCarregando(false);
-        return;
-      }
-
-      if (!data.user || !data.session) {
-        setErro(
-          "Login realizado, mas a sessão não foi criada. Tente novamente."
-        );
+        if (
+          error.message
+            .toLowerCase()
+            .includes("already registered")
+        ) {
+          setErro("Este e-mail já possui uma conta.");
+        } else {
+          setErro(error.message);
+        }
 
         setCarregando(false);
         return;
       }
 
-      console.log("Login realizado:", data.user.email);
+      if (!data.user) {
+        setErro("Não foi possível criar a conta.");
+        setCarregando(false);
+        return;
+      }
 
-      // Dá tempo para o Supabase persistir a sessão
-      await new Promise((resolve) =>
-        setTimeout(resolve, 300)
+      /*
+       * O sistema de 14 dias será iniciado pela página inicial
+       * quando o usuário entrar pela primeira vez.
+       */
+
+      setSucesso(
+        "Conta criada com sucesso! Você será enviado para o login."
       );
 
-      // Vai para a página inicial
-      router.replace("/");
-
-      // Atualiza a navegação depois que a sessão foi salva
-      router.refresh();
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1800);
     } catch (error) {
-      console.error("Erro inesperado no login:", error);
+      console.error("Erro inesperado:", error);
 
       setErro(
-        "Ocorreu um erro ao entrar. Tente novamente."
+        "Ocorreu um erro ao criar sua conta. Tente novamente."
       );
 
       setCarregando(false);
@@ -86,6 +107,7 @@ export default function Login() {
         overflow: "hidden",
       }}
     >
+      {/* Efeito de fundo */}
       <div
         style={{
           position: "absolute",
@@ -112,37 +134,40 @@ export default function Login() {
         }}
       />
 
+      {/* Card */}
       <div
         style={{
           width: "100%",
-          maxWidth: 420,
+          maxWidth: 430,
           background: "rgba(255,255,255,0.97)",
           borderRadius: 28,
-          padding: "35px 28px",
-          boxShadow: "0 25px 70px rgba(0,0,0,0.35)",
+          padding: "32px 28px",
+          boxShadow:
+            "0 25px 70px rgba(0,0,0,0.35)",
           position: "relative",
           zIndex: 1,
           boxSizing: "border-box",
         }}
       >
+        {/* Logo */}
         <div
           style={{
             textAlign: "center",
-            marginBottom: 30,
+            marginBottom: 25,
           }}
         >
           <div
             style={{
-              width: 76,
-              height: 76,
-              margin: "0 auto 16px",
-              borderRadius: 22,
+              width: 70,
+              height: 70,
+              margin: "0 auto 14px",
+              borderRadius: 20,
               background:
                 "linear-gradient(135deg, #2563eb, #0ea5e9)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 40,
+              fontSize: 36,
               boxShadow:
                 "0 12px 30px rgba(37,99,235,0.35)",
             }}
@@ -154,12 +179,11 @@ export default function Login() {
             style={{
               margin: 0,
               color: "#0f172a",
-              fontSize: 30,
+              fontSize: 28,
               fontWeight: 800,
-              letterSpacing: "-0.5px",
             }}
           >
-            RotaPro
+            Criar sua conta
           </h1>
 
           <p
@@ -167,15 +191,49 @@ export default function Login() {
               marginTop: 8,
               marginBottom: 0,
               color: "#64748b",
-              fontSize: 15,
+              fontSize: 14,
             }}
           >
-            Controle seus serviços.
-            Simplifique sua rotina.
+            Comece a usar o RotaPro gratuitamente.
           </p>
         </div>
 
-        <form onSubmit={entrar}>
+        {/* Formulário */}
+        <form onSubmit={cadastrar}>
+          {/* Nome */}
+          <label
+            style={{
+              display: "block",
+              color: "#334155",
+              fontSize: 14,
+              fontWeight: 700,
+              marginBottom: 7,
+            }}
+          >
+            Nome
+          </label>
+
+          <input
+            type="text"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            placeholder="Digite seu nome"
+            required
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "15px 16px",
+              borderRadius: 14,
+              border: "1px solid #cbd5e1",
+              background: "#f8fafc",
+              color: "#0f172a",
+              fontSize: 16,
+              outline: "none",
+              marginBottom: 17,
+            }}
+          />
+
+          {/* E-mail */}
           <label
             style={{
               display: "block",
@@ -195,7 +253,6 @@ export default function Login() {
             placeholder="Digite seu e-mail"
             required
             autoComplete="email"
-            disabled={carregando}
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -206,10 +263,11 @@ export default function Login() {
               color: "#0f172a",
               fontSize: 16,
               outline: "none",
-              marginBottom: 18,
+              marginBottom: 17,
             }}
           />
 
+          {/* Senha */}
           <label
             style={{
               display: "block",
@@ -226,10 +284,47 @@ export default function Login() {
             type="password"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            placeholder="Digite sua senha"
+            placeholder="Mínimo de 6 caracteres"
             required
-            autoComplete="current-password"
-            disabled={carregando}
+            minLength={6}
+            autoComplete="new-password"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "15px 16px",
+              borderRadius: 14,
+              border: "1px solid #cbd5e1",
+              background: "#f8fafc",
+              color: "#0f172a",
+              fontSize: 16,
+              outline: "none",
+              marginBottom: 17,
+            }}
+          />
+
+          {/* Confirmar senha */}
+          <label
+            style={{
+              display: "block",
+              color: "#334155",
+              fontSize: 14,
+              fontWeight: 700,
+              marginBottom: 7,
+            }}
+          >
+            Confirmar senha
+          </label>
+
+          <input
+            type="password"
+            value={confirmarSenha}
+            onChange={(e) =>
+              setConfirmarSenha(e.target.value)
+            }
+            placeholder="Digite a senha novamente"
+            required
+            minLength={6}
+            autoComplete="new-password"
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -244,6 +339,7 @@ export default function Login() {
             }}
           />
 
+          {/* Erro */}
           {erro && (
             <div
               style={{
@@ -261,6 +357,25 @@ export default function Login() {
             </div>
           )}
 
+          {/* Sucesso */}
+          {sucesso && (
+            <div
+              style={{
+                background: "#f0fdf4",
+                color: "#15803d",
+                border: "1px solid #bbf7d0",
+                padding: 12,
+                borderRadius: 12,
+                fontSize: 14,
+                marginBottom: 15,
+                textAlign: "center",
+              }}
+            >
+              ✅ {sucesso}
+            </div>
+          )}
+
+          {/* Botão */}
           <button
             type="submit"
             disabled={carregando}
@@ -283,49 +398,51 @@ export default function Login() {
                 : "0 10px 25px rgba(37,99,235,0.30)",
             }}
           >
-            {carregando ? "Entrando..." : "Entrar"}
+            {carregando
+              ? "Criando conta..."
+              : "Criar minha conta"}
           </button>
-
-          <div
-            style={{
-              textAlign: "center",
-              marginTop: 22,
-              paddingTop: 20,
-              borderTop: "1px solid #e2e8f0",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                color: "#64748b",
-                fontSize: 14,
-              }}
-            >
-              Ainda não possui uma conta?
-            </p>
-
-            <Link
-              href="/cadastro"
-              style={{
-                display: "inline-block",
-                marginTop: 8,
-                color: "#2563eb",
-                fontSize: 15,
-                fontWeight: 800,
-                textDecoration: "none",
-              }}
-            >
-              Criar minha conta →
-            </Link>
-          </div>
         </form>
 
+        {/* Voltar para login */}
         <div
           style={{
             textAlign: "center",
-            marginTop: 25,
+            marginTop: 22,
             paddingTop: 20,
             borderTop: "1px solid #e2e8f0",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              color: "#64748b",
+              fontSize: 14,
+            }}
+          >
+            Já possui uma conta?
+          </p>
+
+          <Link
+            href="/login"
+            style={{
+              display: "inline-block",
+              marginTop: 8,
+              color: "#2563eb",
+              fontSize: 15,
+              fontWeight: 800,
+              textDecoration: "none",
+            }}
+          >
+            ← Voltar para entrar
+          </Link>
+        </div>
+
+        {/* Rodapé */}
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 22,
             color: "#94a3b8",
             fontSize: 12,
           }}
@@ -336,3 +453,4 @@ export default function Login() {
     </main>
   );
 }
+
